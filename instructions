@@ -2,3 +2,9 @@ Use the code in a creative way. Sure its allowed to just rename it and copy and 
 instead use this code in a creative way
 It uses pysides6 web engine view to display websites which is based off chromium
 Get Python and Pyside6 to edit this code.
+
+We use the Pyside6 Qtwidgets 
+Pyside6 allows for LGPL and GPL licenses while Qt is for closed source software
+
+To edit use the open with feature
+and choose your desired code editor.
