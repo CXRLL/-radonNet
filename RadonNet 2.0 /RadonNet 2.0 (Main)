@@ -1,0 +1,241 @@
+import sys
+import json
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLineEdit, QPushButton, QTabWidget, QToolBar, QMenu, QLabel, QMessageBox, QInputDialog
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtGui import QPixmap
+import qrcode
+import wikipedia
+import wolframalpha
+from io import BytesIO
+
+class Browser(QMainWindow):
+    def __init__(self, wolfram_alpha_app_id):
+        super().__init__()
+        self.setWindowTitle("RadonNet 2.0 (Public Release)")
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
+        self.address_bar = QLineEdit()
+        layout.addWidget(self.address_bar)
+
+        toolbar = QToolBar()
+        self.addToolBar(toolbar)
+        home_button = self.create_button("⌂", self.go_home)
+        back_button = self.create_button("◄", self.go_back)
+        forward_button = self.create_button("►", self.go_forward)
+        refresh_button = self.create_button("↺", self.refresh)
+        toolbar.addWidget(home_button)
+        toolbar.addWidget(back_button)
+        toolbar.addWidget(forward_button)
+        toolbar.addWidget(refresh_button)
+
+        add_tab_button = self.create_button("+", self.add_tab)
+        delete_tab_button = self.create_button("X", self.remove_tab)
+        toolbar.addWidget(add_tab_button)
+        toolbar.addWidget(delete_tab_button)
+
+        options_menu = QMenu("Options", self)
+        options_menu.addAction("Dark Mode")
+        search_engine_menu = options_menu.addMenu("Change Default Search Engine")
+        search_engine_menu.addAction("Google", self.change_search_engine_google)
+        search_engine_menu.addAction("Bing", self.change_search_engine_bing)
+        search_engine_menu.addAction("Yahoo", self.change_search_engine_yahoo)
+        search_engine_menu.addAction("DuckDuckGo", self.change_search_engine_duckduckgo)
+
+        # Add bookmarks and password manager options to the "Options" menu
+        bookmarks_action = options_menu.addAction("Bookmarks")
+        bookmarks_action.triggered.connect(self.open_bookmarks)
+        password_manager_action = options_menu.addAction("Password Manager")
+        password_manager_action.triggered.connect(self.open_password_manager)
+
+        options_button = QPushButton("Options")
+        options_button.setMenu(options_menu)
+        toolbar.addWidget(options_button)
+
+        extensions_menu = QMenu("Extensions", self)
+        qr_code_action = extensions_menu.addAction("QR Code Generator")
+        qr_code_action.triggered.connect(self.open_qr_code_generator)
+        aspire_ai_action = extensions_menu.addAction("Solaris Assitant")
+        aspire_ai_action.triggered.connect(self.open_aspire_ai_chatbot)
+        extensions_button = QPushButton("Extensions")
+        extensions_button.setMenu(extensions_menu)
+        toolbar.addWidget(extensions_button)
+
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        self.add_tab()
+
+        self.wolfram_alpha_app_id = wolfram_alpha_app_id
+
+        # Load cookies
+        self.load_cookies()
+
+    def create_button(self, text, function):
+        button = QPushButton(text)
+        button.clicked.connect(function)
+        button.setMaximumWidth(30)
+        return button
+
+    def add_tab(self):
+        webview = QWebEngineView()
+        self.tabs.addTab(webview, "New Tab")
+        self.load_url("https://www.google.com", webview)
+
+    def remove_tab(self):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(self.tabs.currentIndex())
+
+    def load_url(self, url, webview=None):
+        if not webview:
+            webview = self.tabs.currentWidget()
+        webview.load(url)
+
+    def go_home(self):
+        self.load_url("https://www.google.com")
+
+    def go_back(self):
+        current_webview = self.tabs.currentWidget()
+        current_webview.back()
+
+    def go_forward(self):
+        current_webview = self.tabs.currentWidget()
+        current_webview.forward()
+
+    def refresh(self):
+        current_webview = self.tabs.currentWidget()
+        current_webview.reload()
+
+    def change_search_engine_google(self):
+        self.load_url("https://www.google.com")
+
+    def change_search_engine_bing(self):
+        self.load_url("https://www.bing.com")
+
+    def change_search_engine_yahoo(self):
+        self.load_url("https://www.yahoo.com")
+
+    def change_search_engine_duckduckgo(self):
+        self.load_url("https://www.duckduckgo.com")
+
+    def open_qr_code_generator(self):
+        current_webview = self.tabs.currentWidget()
+        url = current_webview.url().toString()
+        self.show_qr_code(url)
+
+    def show_qr_code(self, data):
+        img = self.generate_qr_code(data)
+        qt_pixmap = self.convert_image_to_pixmap(img)
+        qr_window = QWidget()
+        qr_window.setWindowTitle("QR Code")
+        qr_window.resize(300, 300)
+        layout = QVBoxLayout(qr_window)
+        label = QLabel()
+        label.setPixmap(qt_pixmap)
+        layout.addWidget(label)
+        qr_window.setLayout(layout)
+        qr_window.show()
+
+    def generate_qr_code(self, data):
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(fill='black', back_color='white')
+        return img
+
+    def convert_image_to_pixmap(self, image):
+        byte_array = BytesIO()
+        image.save(byte_array, format='PNG')
+        qt_pixmap = QPixmap()
+        qt_pixmap.loadFromData(byte_array.getvalue())
+        return qt_pixmap
+
+    def open_aspire_ai_chatbot(self):
+        user_query, ok = QInputDialog.getText(self, "Solaris Assitant", "Enter your query:")
+        if ok and user_query:
+            response = self.get_aspire_ai_response(user_query)
+            self.show_message_box("Solaris Assitant", response)
+
+    def get_aspire_ai_response(self, query):
+        response = ""
+        response_type = self.ask_user_query_type()
+        if response_type == "Wolfram Alpha":
+            response = self.get_wolfram_alpha_response(query)
+        elif response_type == "Wikipedia":
+            response = self.get_wikipedia_response(query)
+        return response
+
+    def ask_user_query_type(self):
+        query_types = ["Wolfram Alpha", "Wikipedia"]
+        query_type, ok = QInputDialog.getItem(self, "Select Query Type", "Choose the type of query:", query_types, 0, False)
+        if ok and query_type:
+            return query_type
+        else:
+            return ""
+
+    def get_wolfram_alpha_response(self, query):
+        try:
+            client = wolframalpha.Client(self.wolfram_alpha_app_id)
+            response = client.query(query)
+            result = next(response.results).text
+            return result
+        except Exception as e:
+            return str(e)
+
+    def get_wikipedia_response(self, query):
+        try:
+            result = wikipedia.summary(query, sentences=2)
+            return result
+        except wikipedia.exceptions.DisambiguationError as e:
+            return "Multiple results found. Please be more specific."
+        except wikipedia.exceptions.PageError as e:
+            return "No Wikipedia page found for the given query."
+
+    def show_message_box(self, title, message):
+        QMessageBox.information(self, title, message)
+
+    def open_password_manager(self):
+        # Placeholder function for password manager
+        self.show_message_box("Password Manager", "Password manager feature will be available soon.")
+
+    def open_bookmarks(self):
+        # Placeholder function for bookmarks manager
+        self.show_message_box("Bookmarks", "Bookmarks feature will be available soon.")
+
+    def closeEvent(self, event):
+        # Save cookies when exiting
+        self.save_cookies()
+        super().closeEvent(event)
+
+    def save_cookies(self):
+        cookies = []
+        for index in range(self.tabs.count()):
+            webview = self.tabs.widget(index)
+            cookies.extend(webview.page().profile().cookiesForUrl(webview.url()))
+        with open("cookies.json", "w") as file:
+            json.dump(cookies, file)
+
+    def load_cookies(self):
+        try:
+            with open("cookies.json", "r") as file:
+                cookies = json.load(file)
+                for index in range(self.tabs.count()):
+                    webview = self.tabs.widget(index)
+                    for cookie in cookies:
+                        webview.page().profile().setHttpCookie(cookie)
+        except FileNotFoundError:
+            pass
+
+
+if __name__ == "__main__":
+    wolfram_alpha_app_id = 'R55QKE-PQ6GH3KYWG'
+    app = QApplication(sys.argv)
+    window = Browser(wolfram_alpha_app_id)
+    window.show()
+    sys.exit(app.exec())
