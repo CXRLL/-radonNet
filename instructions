@@ -12,3 +12,5 @@ and choose your desired code editor.
 install python on python.org
 install pyside6 using pip install PySide6
 if you dont have pip get the script on https://bootstrap.pypa.io/get-pip.py (You will go in powershell for this)
+
+cookies.json is where your cookies go to!
